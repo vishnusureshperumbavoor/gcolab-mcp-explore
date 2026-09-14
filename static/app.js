@@ -59,8 +59,6 @@ rich.print("[bold green]✅ Packages installed and imported successfully![/bold 
 // DOM Elements
 const statusBadge = document.getElementById("statusBadge");
 const statusText = document.getElementById("statusText");
-const btnConnect = document.getElementById("btnConnect");
-const connectBtnLabel = document.getElementById("connectBtnLabel");
 
 const codeEditor = document.getElementById("codeEditor");
 const snippetSelector = document.getElementById("snippetSelector");
@@ -136,6 +134,8 @@ function setupEditor() {
   });
 }
 
+let isConnected = false;
+
 // Event Listeners
 function setupEvents() {
   snippetSelector.addEventListener("change", (e) => {
@@ -152,18 +152,6 @@ function setupEvents() {
 
   btnExecute.addEventListener("click", () => {
     executeCurrentCode();
-  });
-
-  btnConnect.addEventListener("click", async () => {
-    try {
-      connectBtnLabel.textContent = "Connecting...";
-      const res = await fetch("/api/connect", { method: "POST" });
-      const data = await res.json();
-      console.log("Connect response:", data);
-      checkStatus();
-    } catch (err) {
-      console.error("Connect error:", err);
-    }
   });
 
   btnClearOutput.addEventListener("click", () => {
@@ -198,21 +186,17 @@ async function checkStatus() {
 }
 
 function updateStatusUI(data) {
+  isConnected = !!data.connected;
   statusBadge.className = "status-pill";
   if (data.connected) {
     statusBadge.classList.add("status-connected");
-    statusText.textContent = "Connected to Colab";
-    btnConnect.classList.add("hidden");
+    statusText.textContent = "Colab: Connected";
   } else if (data.status === "connecting") {
     statusBadge.classList.add("status-connecting");
-    statusText.textContent = "Connecting Tab...";
-    btnConnect.classList.remove("hidden");
-    connectBtnLabel.textContent = "Opening Colab...";
+    statusText.textContent = "Colab: Connecting Tab...";
   } else {
-    statusBadge.classList.add("status-disconnected");
-    statusText.textContent = "Disconnected";
-    btnConnect.classList.remove("hidden");
-    connectBtnLabel.textContent = "Connect Colab Tab";
+    statusBadge.classList.add("status-ready");
+    statusText.textContent = "Colab: Ready (Auto-connects on run)";
   }
 }
 
@@ -229,7 +213,12 @@ async function executeCurrentCode() {
 
   terminalPlaceholder.classList.add("hidden");
   outputPre.classList.remove("hidden");
-  outputPre.textContent = "⏳ Executing in Google Colab cloud kernel...\n";
+  
+  if (!isConnected) {
+    outputPre.textContent = "⚡ Colab tab not connected.\n👉 Automatically opening Google Colab in your browser and connecting...\n⏳ Please wait a moment while the session pairs...\n";
+  } else {
+    outputPre.textContent = "⏳ Executing in Google Colab cloud kernel...\n";
+  }
 
   executionStartTime = Date.now();
   execTimer.classList.remove("hidden");
@@ -259,6 +248,8 @@ async function executeCurrentCode() {
     } else {
       let out = data.output || "No output returned.";
       outputPre.textContent = out;
+      isConnected = true;
+      checkStatus();
     }
   } catch (err) {
     clearInterval(timerInterval);

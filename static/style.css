@@ -160,6 +160,15 @@ body {
   animation: pulse 1.5s infinite;
 }
 
+.status-ready {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+}
+.status-ready .status-dot {
+  background: #818cf8;
+}
+
 .status-disconnected {
   background: var(--status-disconnected-bg);
   border-color: var(--status-disconnected-border);

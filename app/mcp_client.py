@@ -254,13 +254,35 @@ class ColabMCPClient:
         res = await self.call_tool("open_colab_browser_connection", {})
         return {"status": "connecting", "result": res}
 
+    async def ensure_connected(self, timeout: float = 45.0):
+        """Ensures a connected session exists. If not, automatically triggers browser pairing and waits."""
+        if self.status == "connected":
+            return
+
+        self._connected_event.clear()
+        self.status = "connecting"
+        self.status_message = "Opening Colab tab and establishing connection..."
+        self.log("Session not connected. Auto-triggering open_colab_browser_connection...")
+
+        try:
+            await self.call_tool("open_colab_browser_connection", {})
+        except Exception as e:
+            self.status = "error"
+            self.status_message = f"Failed to initiate browser connection: {e}"
+            raise RuntimeError(self.status_message)
+
+        try:
+            await asyncio.wait_for(self._connected_event.wait(), timeout=timeout)
+            self.log("Auto-connection successful! Tools unlocked.")
+        except asyncio.TimeoutError:
+            self.status = "disconnected"
+            self.status_message = "Connection timed out. Please check Chrome."
+            raise RuntimeError("Timed out waiting for Google Colab tab to pair. Please ensure the opened tab loaded successfully in Chrome.")
+
     async def execute_code(self, code: str, keep_cell: bool = True) -> Dict[str, Any]:
-        """Inserts a code cell into Colab, executes it, and returns the output."""
-        if self.status != "connected":
-            # Attempt auto-connection check
-            await self.refresh_tools()
-            if self.status != "connected":
-                raise RuntimeError("Colab session is not connected. Please connect your Colab tab first.")
+        """Inserts a code cell into Colab, executes it, and returns the output.
+        Automatically connects to Colab if not already connected."""
+        await self.ensure_connected()
 
         async with self._lock:
             self.log("Inserting code cell...")
