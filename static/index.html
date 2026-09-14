@@ -57,9 +57,11 @@
         </div>
 
         <div class="editor-container">
-          <div class="editor-wrapper">
-            <textarea id="codeEditor" spellcheck="false" placeholder="# Type Python code or shell commands (e.g. !nvidia-smi)&#10;# Press Ctrl + Enter to execute remotely on Colab"></textarea>
-          </div>
+          <form id="colabForm" toolname="executeColabCode" tooldescription="Executes Python code or shell commands on Google Colab cloud GPU" toolautosubmit="false" onsubmit="event.preventDefault(); executeCurrentCode();">
+            <div class="editor-wrapper">
+              <textarea id="codeEditor" name="code" spellcheck="false" toolparamdescription="Python code or shell commands to run in Google Colab (e.g. !nvidia-smi)" placeholder="# Type Python code or shell commands (e.g. !nvidia-smi)&#10;# Press Ctrl + Enter to execute remotely on Colab"></textarea>
+            </div>
+          </form>
         </div>
 
         <div class="editor-footer">
@@ -102,6 +104,14 @@
               </svg>
               <span>Notebook Cells</span>
             </button>
+            <button class="tab-btn" data-tab="webmcpTab">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+              <span>WebMCP Tools</span>
+            </button>
             <button class="tab-btn" data-tab="apiTab">
               <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
                 <circle cx="12" cy="12" r="10"></circle>
@@ -135,7 +145,7 @@
             <div class="terminal-placeholder">
               <div class="terminal-icon">⚡</div>
               <p>Ready to run. Output from Google Colab will appear here in real-time.</p>
-              <span class="hint">Connect your tab once, then run any code without opening extra tabs!</span>
+              <span class="hint">Auto-connects on first run with zero extra tabs opened!</span>
             </div>
             <pre id="outputPre" class="hidden"></pre>
           </div>
@@ -148,19 +158,46 @@
             <button id="btnRefreshCells" class="btn btn-secondary btn-sm">Refresh Cells</button>
           </div>
           <div id="cellsList" class="cells-list">
-            <div class="empty-state">No cells loaded yet. Connect Colab and click Refresh.</div>
+            <div class="empty-state">No cells loaded yet. Run a cell to connect and refresh.</div>
           </div>
         </div>
 
-        <!-- Tab 3: Agent API -->
+        <!-- Tab 3: WebMCP Tools Explorer -->
+        <div id="webmcpTab" class="tab-content">
+          <div class="webmcp-guide">
+            <div class="webmcp-header-status">
+              <div>
+                <h3>WebMCP Browser Registration</h3>
+                <p>These tools are registered in <code>navigator.modelContext</code> for AI agents visiting this page.</p>
+              </div>
+              <span id="webmcpPill" class="badge-pill">Checking WebMCP...</span>
+            </div>
+
+            <div id="webmcpToolList" class="webmcp-tools-list">
+              <!-- Dynamically populated from navigator.modelContext -->
+            </div>
+
+            <div class="webmcp-test-box">
+              <h4>Test WebMCP Tool Execution</h4>
+              <p>Simulate an AI agent invoking <code>navigator.modelContext.registerTool</code> directly:</p>
+              <div class="test-row">
+                <button id="btnTestWebMCP" class="btn btn-secondary btn-sm">
+                  ⚡ Invoke <code>execute_python_on_colab</code> via WebMCP API
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Agent API -->
         <div id="apiTab" class="tab-content">
           <div class="api-guide">
-            <h3>AI Agent Integration</h3>
+            <h3>AI Agent Integration (REST)</h3>
             <p>Any AI agent or external service can execute code remotely on Google Colab by calling this local endpoint:</p>
             
             <div class="code-block-wrapper">
               <span class="code-label">cURL Example</span>
-              <pre><code>curl -X POST http://localhost:8000/api/execute \
+              <pre><code>curl -X POST http://localhost:8080/api/execute \
   -H "Content-Type: application/json" \
   -d '{"code": "import torch; print(torch.cuda.is_available())"}'</code></pre>
             </div>
@@ -169,7 +206,7 @@
               <span class="code-label">Python Example</span>
               <pre><code>import requests
 
-res = requests.post("http://localhost:8000/api/execute", json={
+res = requests.post("http://localhost:8080/api/execute", json={
     "code": "!nvidia-smi"
 })
 print(res.json()["output"])</code></pre>

@@ -37,6 +37,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# WebMCP Specification Compliance Headers
+@app.middleware("http")
+async def add_webmcp_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Enable WebMCP tools permissions and origin isolation
+    response.headers["Permissions-Policy"] = "tools=(self)"
+    response.headers["Origin-Agent-Cluster"] = "?1"
+    return response
+
 # Mount static files directory
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 os.makedirs(STATIC_DIR, exist_ok=True)

@@ -80,6 +80,10 @@ const tabContents = document.querySelectorAll(".tab-content");
 const btnRefreshCells = document.getElementById("btnRefreshCells");
 const cellsList = document.getElementById("cellsList");
 
+const webmcpPill = document.getElementById("webmcpPill");
+const webmcpToolList = document.getElementById("webmcpToolList");
+const btnTestWebMCP = document.getElementById("btnTestWebMCP");
+
 let isRunning = false;
 let executionStartTime = 0;
 let timerInterval = null;
@@ -89,6 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupEditor();
   setupEvents();
+  initWebMCP();
   checkStatus();
   setInterval(checkStatus, 3000); // Periodic status check
   
@@ -110,6 +115,8 @@ function setupTabs() {
 
       if (targetTab === "notebookTab") {
         fetchCells();
+      } else if (targetTab === "webmcpTab") {
+        renderWebMCPTools();
       }
     });
   });
@@ -345,4 +352,143 @@ window.deleteSpecificCell = async function(cellId) {
 function escapeHtml(text) {
   const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
   return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+// ─────────────────────────────────────────────────────────────
+// WebMCP Implementation (W3C Proposed Standard)
+// ─────────────────────────────────────────────────────────────
+
+const registeredWebMCPTools = [];
+
+function initWebMCP() {
+  const isNative = typeof navigator !== "undefined" && "modelContext" in navigator;
+  
+  if (!isNative) {
+    // Provide standard-compliant polyfill for browsers without flag enabled
+    navigator.modelContext = {
+      _tools: new Map(),
+      registerTool: function(toolDef) {
+        if (!toolDef || !toolDef.name) throw new Error("Invalid tool definition: missing name");
+        this._tools.set(toolDef.name, toolDef);
+        console.log(`[WebMCP Polyfill] Registered tool: ${toolDef.name}`);
+      },
+      getTools: function() {
+        return Array.from(this._tools.values());
+      }
+    };
+  }
+
+  // 1. Tool: execute_python_on_colab
+  registerSingleTool({
+    name: "execute_python_on_colab",
+    description: "Executes arbitrary Python code or shell commands remotely on Google Colab's cloud GPU and returns the output.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        code: {
+          type: "string",
+          description: "Python code or shell command (e.g., !nvidia-smi) to execute in the notebook."
+        }
+      },
+      required: ["code"]
+    },
+    execute: async (params) => {
+      if (!params || !params.code) throw new Error("Missing 'code' parameter");
+      codeEditor.value = params.code;
+      await executeCurrentCode();
+      return { output: outputPre.textContent };
+    }
+  });
+
+  // 2. Tool: get_colab_notebook_cells
+  registerSingleTool({
+    name: "get_colab_notebook_cells",
+    description: "Retrieves the list of existing code and markdown cells from the active Google Colab notebook.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    },
+    execute: async () => {
+      const res = await fetch("/api/cells");
+      const data = await res.json();
+      return { cells: data.cells || [] };
+    }
+  });
+
+  // 3. Tool: check_colab_status
+  registerSingleTool({
+    name: "check_colab_status",
+    description: "Returns connection status and active capabilities of the Colab session.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    },
+    execute: async () => {
+      const res = await fetch("/api/status");
+      return await res.json();
+    }
+  });
+
+  // Update badge
+  if (webmcpPill) {
+    if (isNative) {
+      webmcpPill.textContent = "🟢 Native Chrome WebMCP Active";
+      webmcpPill.classList.add("native");
+    } else {
+      webmcpPill.textContent = "🟣 WebMCP Active (Polyfill / Ready)";
+    }
+  }
+
+  // Test button
+  if (btnTestWebMCP) {
+    btnTestWebMCP.addEventListener("click", async () => {
+      btnTestWebMCP.disabled = true;
+      btnTestWebMCP.textContent = "Running via WebMCP API...";
+      
+      const tool = registeredWebMCPTools.find(t => t.name === "execute_python_on_colab");
+      if (tool && tool.execute) {
+        try {
+          await tool.execute({
+            code: `import torch\nprint("⚡ Invoked through WebMCP navigator.modelContext API!")\nprint(f"CUDA Available: {torch.cuda.is_available()}")\n!nvidia-smi`
+          });
+          document.querySelector('[data-tab="terminalTab"]').click();
+        } catch (e) {
+          alert(`WebMCP invocation error: ${e.message}`);
+        }
+      }
+      btnTestWebMCP.disabled = false;
+      btnTestWebMCP.innerHTML = `⚡ Invoke <code>execute_python_on_colab</code> via WebMCP API`;
+    });
+  }
+}
+
+function registerSingleTool(toolDef) {
+  try {
+    navigator.modelContext.registerTool(toolDef);
+    registeredWebMCPTools.push(toolDef);
+  } catch (err) {
+    console.warn(`[WebMCP] Could not register tool '${toolDef.name}':`, err);
+  }
+}
+
+function renderWebMCPTools() {
+  if (!webmcpToolList) return;
+  webmcpToolList.innerHTML = "";
+
+  registeredWebMCPTools.forEach(tool => {
+    const card = document.createElement("div");
+    card.className = "webmcp-tool-card";
+
+    card.innerHTML = `
+      <div class="webmcp-tool-top">
+        <span class="webmcp-tool-name">${escapeHtml(tool.name)}</span>
+        <span class="cell-badge">JavaScript Tool</span>
+      </div>
+      <p class="webmcp-tool-desc">${escapeHtml(tool.description)}</p>
+      <div class="webmcp-tool-schema">
+        <pre><code>${escapeHtml(JSON.stringify(tool.inputSchema, null, 2))}</code></pre>
+      </div>
+    `;
+    webmcpToolList.appendChild(card);
+  });
 }

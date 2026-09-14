@@ -1,4 +1,4 @@
-# Google Colab Web MCP Bridge (`gcolab_mcp_web_mcp`)
+# Google Colab MCP Bridge
 
 A persistent web application and agent execution bridge for **Google Colab Model Context Protocol (MCP)**.
 
@@ -53,7 +53,15 @@ Navigate to [http://localhost:8000](http://localhost:8000) in your browser.
    - Live stdout, stderr, execution timer, copy output, and plot support.
 3. **Notebook Cell Manager**:
    - Inspect all existing cells in your Google Colab notebook, run specific cells, or delete cells directly from the dashboard.
-4. **AI Agent Integration API**:
+4. **W3C WebMCP Standard Support (Browser Native)**:
+   - Exposes browser tools via `navigator.modelContext.registerTool`:
+     - `execute_python_on_colab`: Runs code remotely on the Colab kernel.
+     - `get_colab_notebook_cells`: Fetches notebook cells.
+     - `check_colab_status`: Checks connection state.
+   - Annotated Declarative Form (`toolname="executeColabCode"`).
+   - Compliant HTTP headers (`Permissions-Policy: tools=(self)`, `Origin-Agent-Cluster: ?1`).
+   - Compatible with Chrome Canary (`chrome://flags/#enable-webmcp-testing`) and includes an automatic in-page polyfill and tester.
+5. **AI Agent Integration API (REST)**:
    - External agents (or scripts) can send code to Colab via a simple HTTP request:
 
 ```bash
